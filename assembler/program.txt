@@ -1,9 +1,18 @@
 ldr 20 r0
 ldm 22
-push mp
+psh mp
 pop r1
-LABEL1:
+LABEL0:
 clc
-LABEL2:
+LABEL1:
 adc r0 r1 r2
 lls r2 r2
+LABEL2:
+LABEL3:
+LABEL4:
+LABEL5:
+LABEL6:
+LABEL7:
+LABEL8:
+LABEL9:
+LABEL10:
