@@ -1,0 +1,9 @@
+ldr 20 r0
+ldm 22
+push mp
+pop r1
+LABEL1:
+clc
+LABEL2:
+adc r0 r1 r2
+lls r2 r2
