@@ -1,6 +1,29 @@
 //Contains the assembly instructions and a short description for each
 #define INSTRUCTION_COUNT 22
 
+#define LDR 1
+#define LDM 2
+#define ADC 3
+#define SBC 4
+#define AND 5
+#define ORR 6
+#define XOR 7
+#define ARS 8
+#define LRS 9
+#define LLS 10
+#define PSH 11
+#define POP 12
+#define JMI 13
+#define JMR 14
+#define BZC 15
+#define BZS 16
+#define	BCC 17
+#define BCS 18
+#define SEC 19
+#define CLC 20
+#define SEZ 21
+#define CLZ 22
+
 typedef struct {
 	char *string;
 	int opcode;

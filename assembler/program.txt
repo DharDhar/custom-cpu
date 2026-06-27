@@ -2,11 +2,11 @@ ldr 20 r0
 ldm 22
 psh mp
 pop r1
-LABEL0:
 clc
 LABEL1:
 adc r0 r1 r2
 lls r2 r2
+jmi LABEL1
 LABEL2:
 LABEL3:
 LABEL4:

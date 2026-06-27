@@ -20,6 +20,8 @@
 #define TOO_MANY_LABELS 3
 #define TOO_MANY_INSTRUCTIONS 4
 #define SYMBOLS_IN_LABEL 5
+#define UNKNOWN_INSTRUCTION 6
+#define UNKNOWN_LABEL 7
 
 typedef struct Node {
 	char label_name[MAX_LABEL_SIZE+1];
@@ -28,54 +30,117 @@ typedef struct Node {
 	struct Node* next;
 } Node;
 
+Node head_node = {{0}, 0, 0, NULL};
+
 void throw_error(int error_no, FILE *fp);
 void create_label_node(Node **current_node);
-void label_scraper(Node *head_node_ptr, FILE *fp);
-bool is_line_label(int line_num, Node *head_node);
+void label_scraper(FILE *fp);
+bool is_line_label(int line_num);
+int label_instruction(char *label);
+bool is_str_label(char *str);
 
 int main(void)
 {
 	FILE *fp = fopen("program.txt", "r");
-	Node head_node = {{0}, 0, 0, NULL};
 
 	char buf[BUFFER_SIZE] = {0};
 	int line_num = 1;
 	char *instr = {0};
 	bool match_found = false;
+	int errorno = 0;
+	char field1[10] = {0};
+	char field2[20] = {0};
+	char field3[10] = {0};
 
 	if (fp == NULL)
 		throw_error(FILE_OPEN_ERROR, fp);
 
-	label_scraper(&head_node, fp);
+	label_scraper(fp);
 	fclose(fp);
 
 	fp = fopen("program.txt", "r");
 
 	while(fgets(buf, BUFFER_SIZE, fp) != NULL)
 	{
-		if (!isspace(buf[3]) && !is_line_label(line_num, &head_node)) //since 3rd char is empty
+		if (!isspace(buf[3]) && !is_line_label(line_num)) //since 3rd char is empty
 			printf("Error %d\n", line_num);							  //for legal instructions
+/*
+		if (!is_line_label(line_num))
+			printf("%s", buf);
+*/
 		buf[3] = '\0';
 		match_found = false;
 		for (int i = 0; i < INSTRUCTION_COUNT; i++)
 			if (strcmp(buf, instr_str[i].string) == 0)
 			{
-				printf("Match found %.3b\n", instr_str[i].opcode);
+				sscanf(&buf[4], "%s %s %s", field1, field2, field3);
+//		printf("%s %s %s \n", field1, field2, field3);
+				switch (i + 1) {
+					case LDR: printf("%.10b%.3b%.3b\n", atoi(field1), atoi(&field2[1]), i); break;
+					case LDM: printf("%.13b%.3b\n", atoi(field1), i); break;
+					case ARS:
+					case LRS:
+					case LLS: field3[1] = 0;
+					case ADC:
+					case SBC:
+					case AND:
+					case ORR:
+					case XOR: printf("0%.3b%.3b%.3b%.3b%.3b\n", i-2, atoi(&field1[1]), atoi(&field3[1]), atoi(&field2[1]), instr_str[i].opcode); break;
+					case POP:
+					case PSH: printf("00000000%.1b", (i+1)==POP);
+							  if (field1[0] == 'r')
+							      printf("0%.3b%.3b\n", atoi(&field1[1]), instr_str[i].opcode); 
+							  else if (field1[0] == 'p' && field1[1] == 'c')    //psh pc
+								  printf("1000%.3b\n", instr_str[i].opcode);
+							  else if (field1[0] == 'm' && field1[1] == 'p')    //psh mp
+								  printf("1001%.3b\n", instr_str[i].opcode);
+							  break;
+					case JMR:
+					case BZC:
+					case BZS:
+					case BCC:
+					case BCS: printf("0000000%.3b%.3b%.3b\n", field1[1], i-13, instr_str[i].opcode);
+							  break;
+					case JMI: if(is_str_label(field1))
+							  	  printf("%.13b%.3b\n", label_instruction(field1), instr_str[i].opcode);
+							  else 
+							  {
+								  printf("Unknown label at line %d\n", line_num);
+								  errorno = UNKNOWN_LABEL;
+							  } break;
+					case SEC: printf("00000000000" "00" "110\n"); break;
+					case CLC: printf("00000000000" "01" "110\n"); break;
+					case SEZ: printf("00000000000" "10" "110\n"); break;
+					case CLZ: printf("00000000000" "11" "110\n"); break;
+				}
 				match_found = true;
 				break;
 			}
-		if (!match_found && !is_line_label(line_num, &head_node))
+		if (!match_found && !is_line_label(line_num)) 
+		{
 			printf("Unknown instruction at line %d\n", line_num);
+			errorno = UNKNOWN_INSTRUCTION;
+		}
+
+	if (errorno)
+	{
+		fclose(fp);
+		exit(EXIT_FAILURE);
+	}
 		line_num++;
+		
+		field1[0] = 0;
+		field2[0] = 0;
+		field3[0] = 0;
 	}
 
 	fclose(fp);
 	return 0;
 }
 
-void label_scraper(Node *head_node_ptr, FILE *fp)
+void label_scraper(FILE *fp)
 {
-	Node * current_node = head_node_ptr;
+	Node * current_node = &head_node;
 	char buf[BUFFER_SIZE] = {0};
 	int line_num = 1;
 	int label_count = 0;
@@ -85,9 +150,9 @@ void label_scraper(Node *head_node_ptr, FILE *fp)
 	bool is_label = false;
 
 
-	while(fgets(buf, BUFFER_SIZE, fp) != NULL)
-	{
-		for(int i = 0; i < BUFFER_SIZE; i++)
+	while(fgets(buf, BUFFER_SIZE, fp) != NULL) //fgets returns on encountering \n, EOF or BUFFER_SIZE  
+	{                                          //bytes have been read. NULL is returned on EOF.
+		for(int i = 0; i < BUFFER_SIZE; i++)   //cycling through the buffer a character at a time
 		{
 			if (buf[i] == ':')
 			{
@@ -136,9 +201,9 @@ void label_scraper(Node *head_node_ptr, FILE *fp)
 	return;
 }
 
-bool is_line_label(int line_num, Node *head_node)
+bool is_line_label(int line_num)
 {
-	Node *current_node = head_node;
+	Node *current_node = &head_node;
 
 	while(1)
 	{
@@ -171,4 +236,36 @@ void create_label_node(Node **current_node)
 	*current_node = (*current_node)->next;
 	(*current_node)->next = NULL;
 	return;
+}
+
+bool is_str_label(char *str)
+{
+	Node *current_node = &head_node;
+
+	while(1)
+	{
+		if (strcmp(str, current_node->label_name) == 0)
+			return true;
+		if (current_node->next == NULL)
+			break;
+		else
+			current_node = current_node->next;
+	}
+	return false;
+}
+
+int label_instruction(char *label)
+{
+	Node *current_node = &head_node;
+
+	while(1)
+	{
+		if (strcmp(label, current_node->label_name) == 0)
+			return current_node->instruction_num;
+		if (current_node->next == NULL)
+			break;
+		else
+			current_node = current_node->next;
+	}
+	return 0;
 }
