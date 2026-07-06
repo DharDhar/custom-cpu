@@ -1,5 +1,5 @@
-ldr 20 r0
-ldm 22
+ldr 20 r1
+mov r7 @MP
 psh mp
 pop r1
 clc

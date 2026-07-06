@@ -1,5 +1,7 @@
 CXX = gcc
 TARGET = assembler.bin
+P ?= program.txt
+O ?= program.bin
 
 all: $(TARGET)
 
@@ -11,5 +13,5 @@ clean: $(TARGET)
 	rm -f $(TARGET)
 
 run: $(TARGET)
-	./$(TARGET)
+	./$(TARGET) $(P) $(O)
 

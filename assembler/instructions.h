@@ -2,7 +2,7 @@
 #define INSTRUCTION_COUNT 22
 
 #define LDR 1
-#define LDM 2
+#define MOV 2
 #define ADC 3
 #define SBC 4
 #define AND 5
@@ -30,7 +30,7 @@ typedef struct {
 } Instruction;
 
 const Instruction instr_str[] = {{"ldr", 0b000}, //load to register
-		 					     {"ldm", 0b001}, //load to memory
+		 					     {"mov", 0b001}, //load to memory
 							     {"adc", 0b010}, //add with carry
 						   		 {"sbc", 0b010}, //subtract with carry
 						   		 {"and", 0b010}, //bitwise and

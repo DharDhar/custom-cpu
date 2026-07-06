@@ -3,10 +3,11 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include "instructions.h"
 
-/*  TODO: make head_node static
- *		  refactor error messages
+/*  TODO: cleanup 
+ *		 
  *		  
  */
 
@@ -38,10 +39,15 @@ void label_scraper(FILE *fp);
 bool is_line_label(int line_num);
 int label_instruction(char *label);
 bool is_str_label(char *str);
+void write_u16_big_endian(FILE *f, uint32_t value);
 
-int main(void)
+int main(int argc, char *argv[])
 {
-	FILE *fp = fopen("program.txt", "r");
+	FILE *fp = fopen(argv[1], "r");
+	FILE *fo = fopen(argv[2], "wb");
+
+	uint16_t instruction_word;
+	char instruction_buf[17] = {0};
 
 	char buf[BUFFER_SIZE] = {0};
 	int line_num = 1;
@@ -53,12 +59,21 @@ int main(void)
 	char field3[10] = {0};
 
 	if (fp == NULL)
-		throw_error(FILE_OPEN_ERROR, fp);
+	{
+		printf("Error opening prog file\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (fo == NULL)
+	{
+		printf("Error opening output file\n");
+		exit(EXIT_FAILURE);
+	}
 
 	label_scraper(fp);
 	fclose(fp);
 
-	fp = fopen("program.txt", "r");
+	fp = fopen(argv[1], "r");
 
 	while(fgets(buf, BUFFER_SIZE, fp) != NULL)
 	{
@@ -76,8 +91,18 @@ int main(void)
 				sscanf(&buf[4], "%s %s %s", field1, field2, field3);
 //		printf("%s %s %s \n", field1, field2, field3);
 				switch (i + 1) {
-					case LDR: printf("%.10b%.3b%.3b\n", atoi(field1), atoi(&field2[1]), i); break;
-					case LDM: printf("%.13b%.3b\n", atoi(field1), i); break;
+					case LDR: sprintf(instruction_buf,"%.10b%.3b%.3b", atoi(field1), atoi(&field2[1]), i); break;
+					case MOV: sprintf(instruction_buf, "00000"); 
+							  if (field1[0] == 'r')
+								  sprintf(&instruction_buf[5], "0%.3b", atoi(&field1[1]));
+							  else if (strcmp(field1, "@MP") == 0)
+								  sprintf(&instruction_buf[5], "1000");
+							  if (field2[0] == 'r')
+								  sprintf(&instruction_buf[9], "0%.3b", atoi(&field2[1]));
+							  else if (strcmp(field2, "@MP") == 0)
+								  sprintf(&instruction_buf[9], "1000");
+							  sprintf(&instruction_buf[13], "001");
+						  break;
 					case ARS:
 					case LRS:
 					case LLS: field3[1] = 0;
@@ -85,42 +110,49 @@ int main(void)
 					case SBC:
 					case AND:
 					case ORR:
-					case XOR: printf("0%.3b%.3b%.3b%.3b%.3b\n", i-2, atoi(&field1[1]), atoi(&field3[1]), atoi(&field2[1]), instr_str[i].opcode); break;
+					case XOR: sprintf(instruction_buf, "0%.3b%.3b%.3b%.3b%.3b", i-2, atoi(&field1[1]), atoi(&field3[1]), atoi(&field2[1]), instr_str[i].opcode); break;
 					case POP:
-					case PSH: printf("00000000%.1b", (i+1)==POP);
+					case PSH: sprintf(instruction_buf, "00000000%.1b", (i+1)==POP);
 							  if (field1[0] == 'r')
-							      printf("0%.3b%.3b\n", atoi(&field1[1]), instr_str[i].opcode); 
+							      sprintf(&instruction_buf[9], "0%.3b%.3b", atoi(&field1[1]), instr_str[i].opcode); 
 							  else if (field1[0] == 'p' && field1[1] == 'c')    //psh pc
-								  printf("1000%.3b\n", instr_str[i].opcode);
+								  sprintf(&instruction_buf[9], "1000%.3b", instr_str[i].opcode);
 							  else if (field1[0] == 'm' && field1[1] == 'p')    //psh mp
-								  printf("1001%.3b\n", instr_str[i].opcode);
+								  sprintf(&instruction_buf[9], "1001%.3b", instr_str[i].opcode);
 							  break;
 					case JMR:
 					case BZC:
 					case BZS:
 					case BCC:
-					case BCS: printf("0000000%.3b%.3b%.3b\n", field1[1], i-13, instr_str[i].opcode);
+					case BCS: sprintf(instruction_buf, "0000000%.3b%.3b%.3b", field1[1], i-13, instr_str[i].opcode);
 							  break;
 					case JMI: if(is_str_label(field1))
-							  	  printf("%.13b%.3b\n", label_instruction(field1), instr_str[i].opcode);
+							  	  sprintf(instruction_buf, "%.13b%.3b", label_instruction(field1), instr_str[i].opcode);
 							  else 
 							  {
 								  printf("Unknown label at line %d\n", line_num);
 								  errorno = UNKNOWN_LABEL;
 							  } break;
-					case SEC: printf("00000000000" "00" "110\n"); break;
-					case CLC: printf("00000000000" "01" "110\n"); break;
-					case SEZ: printf("00000000000" "10" "110\n"); break;
-					case CLZ: printf("00000000000" "11" "110\n"); break;
+					case SEC: sprintf(instruction_buf, "00000000000" "00" "110"); break;
+					case CLC: sprintf(instruction_buf, "00000000000" "01" "110"); break;
+					case SEZ: sprintf(instruction_buf, "00000000000" "10" "110"); break;
+					case CLZ: sprintf(instruction_buf, "00000000000" "11" "110"); break;
 				}
 				match_found = true;
 				break;
 			}
-		if (!match_found && !is_line_label(line_num)) 
-		{
-			printf("Unknown instruction at line %d\n", line_num);
-			errorno = UNKNOWN_INSTRUCTION;
-		}
+	if (!match_found && !is_line_label(line_num)) 
+	{
+		printf("Unknown instruction at line %d\n", line_num);
+		errorno = UNKNOWN_INSTRUCTION;
+	}
+
+	if (match_found)
+	{
+		printf("%s\n", instruction_buf);
+		instruction_word = strtol(instruction_buf, NULL, 2);
+		write_u16_big_endian(fo, instruction_word);
+	}
 
 	if (errorno)
 	{
@@ -136,6 +168,15 @@ int main(void)
 
 	fclose(fp);
 	return 0;
+}
+
+void write_u16_big_endian(FILE *f, uint32_t value)
+{
+	uint8_t bytes[2];
+	bytes[0] = (value>>8) & 0xFF;
+	bytes[1] = (value) & 0xFF;
+
+	fwrite(bytes, 1, 2, f); 
 }
 
 void label_scraper(FILE *fp)
