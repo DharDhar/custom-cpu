@@ -40,6 +40,7 @@ bool is_line_label(int line_num);
 int label_instruction(char *label);
 bool is_str_label(char *str);
 void write_u16_big_endian(FILE *f, uint32_t value);
+bool is_buf_whitespace(char *buf);
 
 int main(int argc, char *argv[])
 {
@@ -77,6 +78,8 @@ int main(int argc, char *argv[])
 
 	while(fgets(buf, BUFFER_SIZE, fp) != NULL)
 	{
+		if (isspace(buf[0]))
+			continue;
 		if (!isspace(buf[3]) && !is_line_label(line_num)) //since 3rd char is empty
 			printf("Error %d\n", line_num);							  //for legal instructions
 /*
@@ -93,38 +96,38 @@ int main(int argc, char *argv[])
 				switch (i + 1) {
 					case LDR: sprintf(instruction_buf,"%.10b%.3b%.3b", atoi(field1), atoi(&field2[1]), i); break;
 					case MOV: sprintf(instruction_buf, "00000"); 
-							  if (field1[0] == 'r')
-								  sprintf(&instruction_buf[5], "0%.3b", atoi(&field1[1]));
-							  else if (strcmp(field1, "@MP") == 0)
-								  sprintf(&instruction_buf[5], "1000");
 							  if (field2[0] == 'r')
-								  sprintf(&instruction_buf[9], "0%.3b", atoi(&field2[1]));
+								  sprintf(&instruction_buf[5], "0%.3b", atoi(&field2[1]));
 							  else if (strcmp(field2, "@MP") == 0)
+								  sprintf(&instruction_buf[5], "1000");
+							  if (field1[0] == 'r')
+								  sprintf(&instruction_buf[9], "0%.3b", atoi(&field1[1]));
+							  else if (strcmp(field1, "@MP") == 0)
 								  sprintf(&instruction_buf[9], "1000");
 							  sprintf(&instruction_buf[13], "001");
 						  break;
 					case ARS:
 					case LRS:
-					case LLS: field3[1] = 0;
+					case LLS: sprintf(instruction_buf, "0%.3b%.3b%.3b%.3b%.3b", i-2, atoi(&field2[1]), 0, atoi(&field1[1]), instr_str[i].opcode); break;
 					case ADC:
 					case SBC:
 					case AND:
 					case ORR:
-					case XOR: sprintf(instruction_buf, "0%.3b%.3b%.3b%.3b%.3b", i-2, atoi(&field1[1]), atoi(&field3[1]), atoi(&field2[1]), instr_str[i].opcode); break;
+					case XOR: sprintf(instruction_buf, "0%.3b%.3b%.3b%.3b%.3b", i-2, atoi(&field3[1]), atoi(&field2[1]), atoi(&field1[1]), instr_str[i].opcode); break;
 					case POP:
-					case PSH: sprintf(instruction_buf, "00000000%.1b", (i+1)==POP);
+					case PSH: sprintf(instruction_buf, "00000000%.1b", (i+1)==POP); //pop->1  push->0
 							  if (field1[0] == 'r')
 							      sprintf(&instruction_buf[9], "0%.3b%.3b", atoi(&field1[1]), instr_str[i].opcode); 
-							  else if (field1[0] == 'p' && field1[1] == 'c')    //psh pc
+							  else if (strcmp(field1, "PC") == 0)    //psh pc
 								  sprintf(&instruction_buf[9], "1000%.3b", instr_str[i].opcode);
-							  else if (field1[0] == 'm' && field1[1] == 'p')    //psh mp
+							  else if (strcmp(field1, "@MP") == 0)    //psh mp
 								  sprintf(&instruction_buf[9], "1001%.3b", instr_str[i].opcode);
 							  break;
 					case JMR:
 					case BZC:
 					case BZS:
 					case BCC:
-					case BCS: sprintf(instruction_buf, "0000000%.3b%.3b%.3b", field1[1], i-13, instr_str[i].opcode);
+					case BCS: sprintf(instruction_buf, "0000000%.3b%.3b%.3b", atoi(&field1[1]), i-13, instr_str[i].opcode);
 							  break;
 					case JMI: if(is_str_label(field1))
 							  	  sprintf(instruction_buf, "%.13b%.3b", label_instruction(field1), instr_str[i].opcode);
@@ -168,6 +171,16 @@ int main(int argc, char *argv[])
 
 	fclose(fp);
 	return 0;
+}
+
+
+bool is_buf_whitespace(char *buf)
+{
+	for (int i = 0; buf[i] != '\0'; i++)
+		if (!isspace(buf[i]))
+			return false;
+
+	return true;
 }
 
 void write_u16_big_endian(FILE *f, uint32_t value)
