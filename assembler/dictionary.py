@@ -11,8 +11,7 @@ opcodes = {
     "lls": "010", #logical left shift
     "psh": "011", #push to stack
     "pop": "011", #pop from stack
-    "jmi": "100", #jump to immediate
-    "jmr": "101", #jump to register val
+    "jmp": "100", #jump to immediate or register
     "bzc": "101", #branch if zero flag clear
     "bzs": "101", #branch if zero flag set
     "bcc": "101", #branch if carry flag clear
@@ -22,3 +21,30 @@ opcodes = {
     "sez": "110", #set zero flag
     "clz": "110"  #clear zero flag
 }
+
+alu_instrs = {
+    "adc": "000",
+    "sbc": "001",
+    "and": "010",
+    "orr": "011",
+    "xor": "100",
+    "ars": "101",
+    "lrs": "110",
+    "lls": "111"
+}
+
+jump_instrs = {
+    "jmp": "000",
+    "bzc": "001",
+    "bzs": "010",
+    "bcc": "011",
+    "bcs": "100" 
+}
+
+flag_instrs = {
+    "sec": "00",
+    "clc": "01",
+    "sez": "10",
+    "clz": "11"
+}
+
